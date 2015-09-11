@@ -1,0 +1,518 @@
+var onRun = function(context) {
+  /**
+ * Created by unique on 15/7/7.
+ */
+
+var BASE_DIR = ''
+var exportCell = 0;
+var exportControl = 0;
+
+
+var ALL_RESOLUTION = [
+    {
+        name: "Standard @1x (px)",
+        scale: 1
+    },
+    {
+        name: "Points @1x (pt)",
+        scale: 1
+    },
+    {
+        name: "Retina @2x (pt)",
+        scale: 2
+    },
+    {
+        name: "Retina HD @3x (pt)",
+        scale: 3
+    },
+    {
+        name: "LDPI @0.75x (dp, sp)",
+        scale: .75
+    },
+    {
+        name: "MDPI @1x (dp, sp)",
+        scale: 1
+    },
+    {
+        name: "HDPI @1.5x (dp, sp)",
+        scale: 1.5
+    },
+    {
+        name: "XHDPI @2x (dp, sp)",
+        scale: 2
+    },
+    {
+        name: "XXHDPI @3x (dp, sp)",
+        scale: 3
+    },
+    {
+        name: "XXXHDPI @4x (dp, sp)",
+        scale: 4
+    }
+]
+
+var orion = orion || {};
+
+orion.sketch = {
+
+    // 转换为js字符串
+    toJSString: function(str){
+        return new String(str).toString();
+    },
+
+    // 颜色输出Json
+    colorToJSON: function(color) {
+        return {
+            r: Math.round(color.red() * 255),
+            g: Math.round(color.green() * 255),
+            b: Math.round(color.blue() * 255),
+            a: color.alpha()
+        };
+    },
+
+    // 创建目录
+    createDir: function (path) {
+        var fm = [NSFileManager defaultManager]
+            [fm
+        createDirectoryAtPath:path
+        withIntermediateDirectories:true
+        attributes:null
+        error:null
+        ]
+    },
+    // 选择目录
+    getDirFromPrompt: function () {
+        var panel = [NSOpenPanel openPanel];
+        [panel setMessage:"选择导出目录?"];
+        [panel setCanChooseDirectories:true];
+        [panel setCanChooseFiles:false];
+        [panel setCanCreateDirectories:true];
+        [panel setDirectory:NSHomeDirectory()];
+
+        if ([panel runModal] == NSOKButton) {
+            var message = [panel filename];
+            return message;
+        }
+    },
+
+// 数组转换
+    convertToJSArray: function (nsArray) {
+        var jsArray = [];
+        for (var i = 0, l = [nsArray count]; i < l; i++) {
+            jsArray.push([nsArray objectAtIndex:i]);
+        }
+        return jsArray;
+    },
+
+    // 写JSON文件
+    writeTemplate: function (path, name, data) {
+
+        var outputDir = path + '/'
+        this.createDir(outputDir)
+
+        var outputFile = name + '.json'
+        var dataStr = JSON.stringify(data)
+        print(dataStr)
+
+        var layout = [NSString stringWithString:dataStr]
+        [[layout dataUsingEncoding: NSUTF8StringEncoding] writeToFile: outputDir + outputFile atomically: true]
+    },
+
+
+// 获取填充颜色
+    acquireFillColor: function (data, fillstyles) {
+        data = data || {}
+
+        // 目前仅支持一个背景模式(仅支持单色模式)
+        data.fillColor = '(r:0.0 g:0.0 b:0.0 a:0.0)'  // 默认背景透明
+        for (var j = 0; j < fillstyles.count(); j++) {
+            var fillstyle = [fillstyles objectAtIndex:j]
+            if (fillstyle.isEnabled()) {
+                data.fillColor = '' + fillstyle.color()
+                break
+            }
+        }
+        return data
+    },
+
+    acquireBorderStyle: function (data, borderstyles) {
+        data = data || {}
+
+        // 目前仅支持一个边框模式(仅支持单色模式)
+        data.borderColor = '(r:0.0 g:0.0 b:0.0 a:0.0)'  // 默认无边框
+        data.borderThickness = 0.0
+        for (var j = 0; j < borderstyles.count(); j++) {
+            var borderstyle = [borderstyles objectAtIndex:j]
+            if (borderstyle.isEnabled()) {
+                data.borderColor = '' + borderstyle.color()
+                data.borderThickness = borderstyle.thickness()
+                break
+            }
+        }
+        return data
+    },
+
+
+// 处理Cell属性
+    processCell: function (data, layer) {
+        data = data || {}
+
+        data.width = layer.frame().width()
+        data.height = layer.frame().height()
+        data.opacity = layer.style().contextSettings().opacity()
+
+        // 获取背景填充色
+        var fillstyles = layer.style().fills().array()
+        data = this.acquireFillColor(data, fillstyles)
+
+        // 倒角半径
+        if ([layer isKindOfClass:[MSLayerGroup class]])
+        {
+            var shape = layer.layers().firstObject()
+            if ([shape isKindOfClass:[MSRectangleShape class]])
+            {
+                data.radius = shape.fixedRadius()
+            }
+        }
+
+        return data
+    },
+
+// 处理Layer属性
+    processLayer: function (data, layer, prefix) {
+        var obj = {}
+        var name = layer.name()
+
+        // 获取名
+        obj.name = '' + name.substr(prefix)
+        obj.x = layer.frame().x()
+        obj.y = layer.frame().y()
+        obj.width = layer.frame().width()
+        obj.height = layer.frame().height()
+        print(obj)
+
+        return obj
+    },
+
+
+// 处理Label属性
+    processLabel: function (data, layer) {
+
+        var label = this.processLayer(data, layer, 6)
+        label.type = 'Label'
+
+        // 判断类型,如果是ShapeGroup,则获取子Layer的字体和背景色属性
+        // 如果是TextLayer则直接获取字体和背景色属性
+
+        if ([layer isKindOfClass:[MSLayerGroup class]])
+        {
+            var sublayers = layer.layers()
+            for (var j = 0; j < sublayers.count(); j++) {
+                var sublayer = [sublayers objectAtIndex:j]
+                var layerNameStr = '' + sublayer.name()
+
+                if (layerNameStr == 'Text') { // Cell属性
+                    label.fontSize = sublayer.fontSize()
+                    label.textColor = '' + sublayer.textColor()
+                    label.textAlignment = sublayer.textAlignment()  // 0:左对齐 1:右对齐 2:居中 3: 平铺
+                    label.characterSpacing = sublayer.characterSpacing()
+                    label.fontName = '' + sublayer.fontPostscriptName()
+                    label.text = '' + sublayer.stringValue()
+                }
+                else if (layerNameStr == 'Background') { // Label背景属性
+                    // 获取圆角半径
+                    if ([sublayer isKindOfClass:[MSLayerGroup class]])
+                    {
+                        var shape = sublayer.layers().firstObject()
+
+                        if ([shape isKindOfClass:[MSRectangleShape class]])
+                        {
+                            label.radius = shape.fixedRadius()
+                        }
+                    }
+
+                    // 获取背景填充色
+                    var fillstyles = sublayer.style().fills().array()
+                    label = this.acquireFillColor(label, fillstyles)
+                }
+            }
+
+        }
+        else
+        if ([layer isKindOfClass:[MSTextLayer class]])
+        {
+            label.fontSize = layer.fontSize()
+            label.textColor = '' + layer.textColor()
+            label.textAlignment = layer.textAlignment()  // 0:左对齐 1:右对齐 2:居中 3: 平铺
+            label.characterSpacing = layer.characterSpacing()
+            label.fontName = '' + layer.fontPostscriptName()
+            label.lineSpacing = layer.lineSpacing()  // 指一行的完整高度(包含文字高度)
+            label.text = '' + layer.stringValue()
+
+            // 获取背景填充色
+            var fillstyles = layer.style().fills().array()
+            label = this.acquireFillColor(label, fillstyles)
+        }
+        print(label)
+        data.items.push(label)
+        return data
+    },
+
+
+// 处理Image属性
+    processImage: function (data, layer) {
+        var img = this.processLayer(data, layer, 6)
+        img.type = 'Image'
+
+        // 获取边框
+        var borderstyles = layer.style().borders().array()
+        img = this.acquireBorderStyle(img, borderstyles)
+
+        // 获取圆角半径
+        if ([layer isKindOfClass:[MSLayerGroup class]])
+        {
+            var shape = layer.layers().firstObject()
+
+            if ([shape isKindOfClass:[MSRectangleShape class]])
+            {
+                img.radius = shape.fixedRadius()
+            }
+        }
+
+        print(img)
+        data.items.push(img)
+        return data
+    },
+
+// 处理Line属性
+    processLine: function (data, layer) {
+        var line = {}
+        var name = layer.name()
+
+        // 获取Label名
+        line.name = '' + name.substr(5)
+        line.x = layer.frame().x()
+        line.y = layer.frame().y()
+        line.width = layer.frame().width()
+        line.height = layer.frame().height()
+        line.type = 'Line'
+
+        // 获取边框
+        var borderstyles = layer.style().borders().array()
+        line = this.acquireBorderStyle(line, borderstyles)
+
+        print(line)
+        data.items.push(line)
+        return data
+    },
+
+// 处理Image属性
+    processIconFont: function (data, layer) {
+        var icon = this.processLayer(data, layer, 9)
+        icon.type = 'IconFont'
+
+        print(icon)
+        data.items.push(icon)
+        return data
+    },
+
+// 处理View属性
+    processView: function (data, layer) {
+        var view = this.processLayer(data, layer, 5)
+        view.type = 'View'
+
+        print(view)
+        data.items.push(view)
+        return data
+    },
+
+    warn: function (msg) {
+        var alert = [[NSAlert alloc] init]
+            [alert setMessageText:'警告']
+        [alert setInformativeText:msg]
+        [alert addButtonWithTitle:'确定']
+        [alert runModal]
+    },
+
+    // 导出单个Cell对象
+    exportCell: function (cell) {
+
+        var groupName = cell.name()
+
+        // 获取Cell类名
+        var cellName = 'Orion' + groupName.substr(5)
+        print(cellName)
+
+        var data = {}
+        data.family = 'TableViewCell'
+        data.name = '' + cellName
+        data.items = []
+
+        print(data)
+
+        var layers = cell.layers()
+        print(layers)
+
+        for (var j = 0; j < layers.count(); j++) {
+
+            var sublayer = [layers objectAtIndex:j]
+            print(sublayer)
+
+            var layerName = sublayer.name()
+            var layerNameStr = '' + sublayer.name()
+
+            print(layerNameStr)
+            if (layerNameStr == 'Frame') { // Cell属性
+                data = this.processCell(data, sublayer)
+            }
+            else if ([layerName hasPrefix:'Label@'] )
+            {  // Label属性
+                data = this.processLabel(data, sublayer)
+            }
+        else if ([layerName hasPrefix:'Image@'] )
+            {  // Image属性
+                data = this.processImage(data, sublayer)
+            }
+        else if ([layerName hasPrefix:'Line@'] )
+            {  // Line属性
+                data = this.processLine(data, sublayer)
+            }
+            else if ([layerName hasPrefix:'IconFont@'] )
+            {  // IconFont属性
+                data = this.processIconFont(data, sublayer)
+            }
+            else if ([layerName hasPrefix:'ImageArray@'] )
+            {  // ImageArray属性
+                data = this.processIconFont(data, sublayer)
+            }
+            else if ([layerName hasPrefix:'View@'] )
+            {  // 自定义View
+                data = this.processView(data, sublayer)
+            }
+
+        }
+
+        this.writeTemplate(BASE_DIR, cellName, data)
+        exportCell++
+
+    },
+
+    // 导出单个Control对象
+    exportControl: function (ctrl) {
+
+        var groupName = ctrl.name()
+
+        // 获取Control类名
+        var ctrlName = 'Orion' + groupName.substr(5)
+        print(ctrlName)
+
+        var data = {}
+        data.family = 'Control'
+        data.name = '' + ctrlName
+        data.items = []
+
+        print(data)
+
+        var layers = ctrl.layers()
+        print(layers)
+
+        for (var j = 0; j < layers.count(); j++) {
+
+            var sublayer = [layers objectAtIndex:j]
+            print(sublayer)
+
+            var layerName = sublayer.name()
+            var layerNameStr = '' + sublayer.name()
+
+            print(layerNameStr)
+            if (layerNameStr == 'Frame') { // Cell属性
+                data = this.processCell(data, sublayer)
+            }
+            else if ([layerName hasPrefix:'Label@'] )
+            {  // Label属性
+                data = this.processLabel(data, sublayer)
+            }
+        else if ([layerName hasPrefix:'Image@'] )
+            {  // Image属性
+                data = this.processImage(data, sublayer)
+            }
+        else if ([layerName hasPrefix:'Line@'] )
+            {  // Line属性
+                data = this.processLine(data, sublayer)
+            }
+        else if ([layerName hasPrefix:'IconFont@'] )
+            {  // IconFont属性
+                data = this.processIconFont(data, sublayer)
+            }
+        else if ([layerName hasPrefix:'ImageArray@'] )
+            {  // ImageArray属性
+                data = this.processIconFont(data, sublayer)
+            }
+        else if ([layerName hasPrefix:'View@'] )
+            {  // 自定义View
+                data = this.processView(data, sublayer)
+            }
+
+        }
+
+        this.writeTemplate(BASE_DIR, ctrlName, data)
+        exportControl++
+
+    },
+
+    // 运行函数
+    exec:function(context){
+        // 指定导出目录
+        BASE_DIR = this.getDirFromPrompt();
+
+        if (context.selection.count() == 1) {
+            // 判断根对象是否为Cell对象
+            var group = context.selection[0]
+            var groupName = group.name()
+
+            if ([groupName hasPrefix:'Cell@'] )
+            { // 生成Cell配置
+                this.exportCell(group);
+                this.warn('总共导出个' + exportCell + 'Cell!')
+            }
+            else if ([groupName hasPrefix:'Control@'] )
+            { // 生成View配置
+                this.exportControl(group);
+                this.warn('总共导出个' + exportControl + 'Control!')
+            }
+            else
+            {
+                this.warn('请选择一个有效的对象节点!')
+            }
+        }
+        else {
+            // 导出所有对象节点
+            var page = context.document.currentPage();
+            var alllayers = page.layers();
+            for (var i = 0; i < alllayers.count(); i++) {
+
+                var group = [alllayers objectAtIndex:i]
+                print(group)
+
+                var groupName = group.name()
+                if ([groupName hasPrefix:'Cell@'] )
+                { // 生成Cell配置
+                    this.exportCell(group);
+                }
+                else if ([groupName hasPrefix:'Control@'] )
+                { // 生成View配置
+                    this.exportControl(group);
+                }
+
+            }
+            var sum = exportCell + exportControl;
+            this.warn('总共导出个' + sum + '个单元,其中' + exportCell + '个Cell,' + exportControl + '个Control!')
+        }
+
+    }
+}
+
+// 运行
+orion.sketch.exec(context)
+
+};

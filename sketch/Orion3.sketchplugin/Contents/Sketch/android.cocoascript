@@ -1,0 +1,11 @@
+/**
+ * Orion For Android Sketch Plugin
+ * Created by unique on 15/9/9.
+ * 版本 3.3
+ */
+@import "template/android.js"
+@import "lib/common.js"
+
+var onRun = function(context) {
+    orion.sketch.exec(context);
+};

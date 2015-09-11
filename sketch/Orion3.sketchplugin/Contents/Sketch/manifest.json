@@ -1,0 +1,52 @@
+{
+  "author" : "unique",
+  "commands" : [
+    {
+      "script" : "ios.cocoascript",
+      "handler" : "onRun",
+      "shortcut" : "ctrl shift o",
+      "name" : "For iOS",
+      "identifier" : "iOS"
+    },
+    {
+      "script" : "swift.cocoascript",
+      "handler" : "onRun",
+      "shortcut" : "ctrl shift w",
+      "name" : "For Swift",
+      "identifier" : "Swift"
+    },
+    {
+      "script" : "android.cocoascript",
+      "handler" : "onRun",
+      "shortcut" : "ctrl shift d",
+      "name" : "For Android",
+      "identifier" : "Android"
+    },
+    {
+      "script" : "less750.cocoascript",
+      "handler" : "onRun",
+      "shortcut" : "ctrl shift l",
+      "name" : "For Less(750)",
+      "identifier" : "Less750"
+    }
+  ],
+  "menu" : {
+    "items" : [
+      "iOS",
+      "Swift",
+      "Android",
+      {
+        "title": "CSS",
+        "items": [
+          "Less750"
+        ]
+      }
+    ],
+    "title" : "Orion 3.3"
+  },
+  "identifier" : "com.example.sketch.orion",
+  "version" : "3.3",
+  "description" : "A tool for generating code( ios, Swift, android, css)",
+  "authorEmail" : "guobin.gb@alibaba-inc.com",
+  "name" : "Orion"
+}

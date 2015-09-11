@@ -1,0 +1,23 @@
+{
+  "author" : "",
+  "commands" : [
+    {
+      "script" : "script.cocoascript",
+      "handler" : "onRun",
+      "shortcut" : "",
+      "name" : "Orion4Sketch",
+      "identifier" : "orion4sketch"
+    }
+  ],
+  "menu" : {
+    "items" : [
+      "orion4sketch"
+    ],
+    "title" : "Orion4Sketch"
+  },
+  "identifier" : "com.example.sketch.8615502c-80e2-434f-bed5-1ba26bd51a68",
+  "version" : "1.0",
+  "description" : "",
+  "authorEmail" : "",
+  "name" : "Orion4Sketch"
+}
